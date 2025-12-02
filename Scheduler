@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Adaptive Real-Time Scheduler</title>
+
+<style>
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    margin: 0;
+    padding: 30px;
+   
+    background: linear-gradient(135deg, #c3d9ff, #e8e3ff, #ffffff);
+    background-size: 300% 300%;
+    animation: bgMove 12s infinite alternate ease-in-out;
+  }
+
+  @keyframes bgMove {
+    0% { background-position: left top; }
+    100% { background-position: right bottom; }
+  }
+
+  .container {
+    max-width: 900px;
+    margin: auto;
+    padding: 30px;
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    animation: fadeIn 1s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #4f3dcc;
+    font-size: 28px;
+    letter-spacing: 1px;
+  }
+
+ 
+  form {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+
+  input[type="text"], input[type="number"] {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #bbb;
+    width: 180px;
+    outline: none;
+    transition: 0.2s;
+  }
+
+  input[type="text"]:focus, input[type="number"]:focus {
+    border-color: #7045ff;
+    box-shadow: 0 0 6px #d8ccff;
+  }
+
+  input[type="submit"] {
+    padding: 12px 20px;
+    background: #7045ff;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.3s;
+  }
+
+  input[type="submit"]:hover {
+    background: #5230c7;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+
+  th, td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+  }
+
+  th {
+    background: #f6f2ff;
+    font-size: 14px;
+  }
+
+  tr.scheduled {
+    background: #dfffe9 !important;
+    transition: 0.3s;
+    font-weight: bold;
+  }
+
+  tr.expired-row {
+    background: #ffdcdc !important;
+    color: #a80000;
+    font-weight: bold;
+  }
+
+
+  .graph-box {
+    margin-top: 25px;
+    padding: 20px;
+    background: #faf9ff;
+    border-radius: 16px;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+  }
+
+  .footer {
+    margin-top: 20px;
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>Adaptive Real-Time Scheduler</h2>
+  <div class="info-box" style="
+  background: #f3efff;
+  padding: 18px;
+  border-radius: 14px;
+  margin-bottom: 22px;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.06);
+  font-size: 15px;
+  line-height: 1.5;
+  color: #3b2fa3;
+">
+  <b>🔍 What This Simulation Shows</b><br><br>
+  This Adaptive Real-Time Scheduler continuously monitors all tasks you enter. 
+  It calculates their <b>priority</b> using the formula:<br>
+  <b>Priority = Time Left / Workload</b><br><br>
+
+  ✔ A task with <b>less time left</b> gets <b>higher urgency</b><br>
+  ✔ A task with <b>higher workload</b> gets <b>lower priority</b><br><br>
+
+  The scheduler automatically picks the task with the <b>lowest priority value</b> 
+  (most urgent) and highlights it in <b>🟢 green</b>.<br><br>
+
+  If a task’s deadline runs out, it becomes <b>🔴 expired</b> and is highlighted in red.<br><br>
+
+  Below the table, the graph shows how the <b>priority of the selected task</b> 
+  changes over time — giving you a real-time visualization of scheduling decisions.
+</div>
+
+
+  <form id="taskForm">
+    <input type="text" id="tid" placeholder="Task Name" required>
+    <input type="number" id="workload" placeholder="Workload" required min="1">
+    <input type="number" id="deadline" placeholder="Deadline (sec)" required min="1">
+    <input type="submit" value="Add Task">
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Workload</th>
+        <th>Deadline</th>
+        <th>Time Left</th>
+        <th>Priority</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+
+  <div class="graph-box">
+    <h3 style="text-align:center; color:#4f3dcc;">Real-Time Priority Simulation</h3>
+    <canvas id="priorityGraph" width="850" height="280"></canvas>
+  </div>
+
+  <div class="footer">
+    🟢 Green = Next Task to Execute • 🔴 Red = Deadline Missed
+  </div>
+</div>
+
+<script>
+class Task {
+  constructor(name, workload, deadlineSec) {
+    this.name = name;
+    this.workload = Number(workload);
+    this.deadline = Date.now() + deadlineSec * 1000;
+    this.priority = 0;
+  }
+
+  updatePriority() {
+    const timeLeft = Math.max(0.001, (this.deadline - Date.now()) / 1000);
+    this.priority = timeLeft / this.workload;
+  }
+
+  timeLeft() {
+    const t = (this.deadline - Date.now()) / 1000;
+    if (t <= 0) return "0.0s";
+    return t.toFixed(1) + "s";
+  }
+
+  isExpired() {
+    return (this.deadline - Date.now()) <= 0;
+  }
+
+  getDeadlineTime() {
+    return new Date(this.deadline).toLocaleTimeString();
+  }
+}
+
+const tasks = [];
+const graphData = [];
+const maxGraphPoints = 50;
+
+document.getElementById("taskForm").addEventListener("submit", e => {
+  e.preventDefault();
+
+  const tid = document.getElementById("tid").value.trim();
+  const wl = document.getElementById("workload").value;
+  const dl = document.getElementById("deadline").value;
+
+  tasks.push(new Task(tid, wl, dl));
+
+  document.getElementById("tid").value = "";
+  document.getElementById("workload").value = "";
+  document.getElementById("deadline").value = "";
+});
+
+function update() {
+  tasks.forEach(t => t.updatePriority());
+  tasks.sort((a, b) => a.priority - b.priority);
+
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+
+  tasks.forEach((t, index) => {
+    const row = document.createElement("tr");
+
+    if (index === 0 && !t.isExpired()) row.className = "scheduled";
+    if (t.isExpired()) row.classList.add("expired-row");
+
+    row.innerHTML = `
+      <td>${t.name}</td>
+      <td>${t.workload}</td>
+      <td>${t.getDeadlineTime()}</td>
+      <td>${t.timeLeft()}</td>
+      <td>${t.priority.toFixed(3)}</td>
+    `;
+
+    tbody.appendChild(row);
+  });
+
+  updateGraph();
+}
+
+function updateGraph() {
+  const canvas = document.getElementById("priorityGraph");
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (tasks.length === 0) return;
+
+  const topTask = tasks[0];
+  graphData.push(topTask.priority);
+
+  if (graphData.length > maxGraphPoints) graphData.shift();
+
+  ctx.beginPath();
+  ctx.lineWidth = 3;
+  ctx.moveTo(0, canvas.height - graphData[0] * 200);
+
+  for (let i = 1; i < graphData.length; i++) {
+    ctx.lineTo(i * (canvas.width / maxGraphPoints), canvas.height - graphData[i] * 200);
+  }
+
+  ctx.strokeStyle = "#6236ff";
+  ctx.stroke();
+}
+
+setInterval(update, 300);
+</script>
+
+</body>
+</html>
